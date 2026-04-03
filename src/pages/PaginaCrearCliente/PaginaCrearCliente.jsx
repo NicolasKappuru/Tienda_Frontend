@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import ClienteList from "../../components/ClienteList/ClienteList";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function PaginaCrearCliente() {
   const [nombreNuevo, setNombreNuevo] = useState("");
@@ -9,8 +9,20 @@ export default function PaginaCrearCliente() {
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // 🔍 Fetch para validar nombre + sugerencias
+  const modo = location.state?.modo || "crear";
+  const clienteEditar = location.state?.cliente;
+
+  // 🔹 Precargar datos en edición
+  useEffect(() => {
+    if (modo === "editar" && clienteEditar) {
+      setNombreNuevo(clienteEditar.nombre);
+      setTipoCliente(clienteEditar.tipo_cliente);
+    }
+  }, [modo, clienteEditar]);
+
+  // 🔍 Buscar clientes para validación
   useEffect(() => {
     if (!nombreNuevo) {
       setClientes([]);
@@ -45,17 +57,34 @@ export default function PaginaCrearCliente() {
     };
   }, [nombreNuevo]);
 
-  const nombreExistente = clientes.some(
-    (c) => c.nombre.toLowerCase() === nombreNuevo.toLowerCase()
-  );
+  // 🔥 Detectar si el nombre cambió
+  const nombreCambio =
+    modo === "crear" ||
+    nombreNuevo.toLowerCase() !==
+      (clienteEditar?.nombre || "").toLowerCase();
 
-  const handleCrearCliente = async () => {
+  // 🔥 Validación de duplicados (ignorando mismo cliente)
+  const nombreExistente = clientes.some((c) => {
+    const mismoNombre =
+      c.nombre.toLowerCase() === nombreNuevo.toLowerCase();
+
+    const esMismoCliente =
+      modo === "editar" &&
+      (c.id_cliente || c.id) ===
+        (clienteEditar?.id_cliente || clienteEditar?.id);
+
+    return mismoNombre && !esMismoCliente;
+  });
+
+  // 🔥 Crear o editar
+  const handleGuardarCliente = async () => {
     if (!nombreNuevo || !tipoCliente) {
       alert("Debes seleccionar un tipo y escribir un nombre");
       return;
     }
 
-    if (nombreExistente) {
+    // 🔥 Solo valida duplicado si el nombre cambió
+    if (nombreCambio && nombreExistente) {
       alert("Ese nombre ya existe");
       return;
     }
@@ -63,41 +92,58 @@ export default function PaginaCrearCliente() {
     try {
       const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
-      const res = await fetch(`${baseUrl}/negocio/agregarCliente`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nombre: nombreNuevo,
-          tipo_cliente: tipoCliente,
-        }),
-      });
+      if (modo === "editar") {
+        const res = await fetch(`${baseUrl}/negocio/actualizarCliente`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id_cliente: clienteEditar.id_cliente || clienteEditar.id,
+            nombre: nombreNuevo,
+            tipo_cliente: tipoCliente,
+          }),
+        });
 
-      const data = await res.json();
+        const data = await res.json();
 
-      navigate("/pagina-cliente", {
-        state: {
-          cliente: data,
-        },
-      });
+        navigate("/pagina-cliente", {
+          state: { cliente: data },
+        });
+
+      } else {
+        const res = await fetch(`${baseUrl}/negocio/agregarCliente`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: nombreNuevo,
+            tipo_cliente: tipoCliente,
+          }),
+        });
+
+        const data = await res.json();
+
+        navigate("/pagina-cliente", {
+          state: { cliente: data },
+        });
+      }
     } catch (err) {
       console.error(err);
-      alert("Error al crear cliente");
+      alert("Error al guardar cliente");
     }
   };
 
   return (
-    
     <div style={styles.container}>
-
-       {/* 🔙 BOTÓN VOLVER */}
+      {/* 🔙 Volver */}
       <button onClick={() => navigate(-1)} style={styles.backBtn}>
         ←
       </button>
-      
-      <div style={styles.card}>
-        <h1 style={styles.title}>Crear Cliente</h1>
 
-        {/* Input */}
+      <div style={styles.card}>
+        <h1 style={styles.title}>
+          {modo === "editar" ? "Editar Cliente" : "Crear Cliente"}
+        </h1>
+
+        {/* Input nombre */}
         <input
           type="text"
           placeholder="Nombre del cliente"
@@ -111,19 +157,22 @@ export default function PaginaCrearCliente() {
           <div
             style={{
               fontSize: "13px",
-              color: nombreExistente ? "#f87171" : "#4ade80",
+              color:
+                nombreCambio && nombreExistente
+                  ? "#f87171"
+                  : "#4ade80",
               marginTop: "-10px",
             }}
           >
             {loading
               ? "Validando..."
-              : nombreExistente
+              : nombreCambio && nombreExistente
               ? "⚠️ Este nombre ya existe"
-              : "✔ Nombre disponible"}
+              : "✔ Nombre válido"}
           </div>
         )}
 
-        {/* Radios tipo badge */}
+        {/* Tipo cliente */}
         <div style={styles.radioContainer}>
           <div
             style={{
@@ -152,16 +201,20 @@ export default function PaginaCrearCliente() {
         <button
           style={{
             ...styles.button,
-            opacity: nombreExistente ? 0.5 : 1,
-            cursor: nombreExistente ? "not-allowed" : "pointer",
+            opacity:
+              nombreCambio && nombreExistente ? 0.5 : 1,
+            cursor:
+              nombreCambio && nombreExistente
+                ? "not-allowed"
+                : "pointer",
           }}
-          onClick={handleCrearCliente}
-          disabled={nombreExistente}
+          onClick={handleGuardarCliente}
+          disabled={nombreCambio && nombreExistente}
         >
-          Crear Cliente
+          {modo === "editar" ? "Guardar Cambios" : "Crear Cliente"}
         </button>
 
-        {/* Lista (solo sugerencias) */}
+        {/* Sugerencias */}
         <ClienteList clientes={clientes} loading={loading} />
       </div>
     </div>
@@ -204,16 +257,13 @@ const styles = {
     fontSize: "16px",
     borderRadius: "10px",
     border: "1px solid #374151",
-    outline: "none",
     backgroundColor: "#0f172a",
     color: "#f9fafb",
-    boxSizing: "border-box",
   },
 
   radioContainer: {
     display: "flex",
     gap: "10px",
-    justifyContent: "space-between",
   },
 
   radioBadge: {
@@ -223,21 +273,17 @@ const styles = {
     borderRadius: "10px",
     color: "white",
     cursor: "pointer",
-    fontWeight: "500",
-    transition: "0.2s",
-    userSelect: "none",
   },
 
   button: {
     padding: "12px",
-    fontSize: "16px",
     borderRadius: "10px",
     border: "none",
-    cursor: "pointer",
     backgroundColor: "#4f46e5",
     color: "white",
     fontWeight: "500",
   },
+
   backBtn: {
     position: "absolute",
     top: "20px",
@@ -248,11 +294,6 @@ const styles = {
     width: "40px",
     height: "40px",
     borderRadius: "10px",
-    fontSize: "18px",
     cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 10,
   },
 };

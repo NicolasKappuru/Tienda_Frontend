@@ -1,6 +1,10 @@
 import React from "react";
 
 export default function MontoTotal({ valor }) {
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat("es-CO").format(value);
+  };
+
   const styles = {
     container: {
       width: "100%",
@@ -33,7 +37,7 @@ export default function MontoTotal({ valor }) {
   return (
     <div style={styles.container}>
       <span style={styles.label}>Total</span>
-      <span style={styles.value}>${valor || 0}</span>
+      <span style={styles.value}>${formatCurrency(valor || 0)}</span>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import ClienteBadge from "../../components/ClienteBadge/ClienteBadge";
 import MontoList from "../../components/MontoList/MontoList";
 import MontoDetalleModal from "../../components/MontoDetalleModal/MontoDetalleModal";
 import MontoTotal from "../../components/MontoTotal/MontoTotal";
+
 export default function PaginaCliente() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -11,7 +12,9 @@ export default function PaginaCliente() {
   const { cliente } = location.state || {};
 
   const [montos, setMontos] = useState([]);
+  const [total, setTotal] = useState(0);
   const [montoSeleccionado, setMontoSeleccionado] = useState(null);
+  const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
 
   useEffect(() => {
     if (!cliente?.id) return;
@@ -19,7 +22,10 @@ export default function PaginaCliente() {
 
     fetch(`${baseUrl}/negocio/montos?cliente_id=${cliente.id}`)
       .then((res) => res.json())
-      .then((data) => setMontos(data))
+      .then((data) => {
+        setMontos(data.movimientos || []);
+        setTotal(data.total || 0);
+      })
       .catch((err) => console.error(err));
   }, [cliente]);
 
@@ -45,40 +51,58 @@ export default function PaginaCliente() {
     });
   };
 
-  const handlePagarTodo = async () => {
-    const confirmar = window.confirm("¿Seguro que deseas pagar todo?");
-    if (!confirmar) return;
-
+  const ejecutarPagoTotal = async () => {
     try {
       const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
-      await fetch(
-        `${baseUrl}/negocio/pagarTodo?cliente_id=${cliente.id}`,
-        { method: "POST" }
-      );
+      await fetch(`${baseUrl}/negocio/pagarTodo`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id_cliente: cliente.id,
+          tipo_cliente: cliente.tipo_cliente,
+        }),
+      });
 
       const res = await fetch(
         `${baseUrl}/negocio/montos?cliente_id=${cliente.id}`
       );
       const data = await res.json();
-      setMontos(data);
+
+      setMontos(data.movimientos || []);
+      setTotal(data.total || 0);
     } catch (err) {
       console.error(err);
+    } finally {
+      setMostrarConfirmacion(false);
     }
   };
 
   return (
     <div style={styles.container}>
-
       <div style={styles.card}>
+        {/* Header */}
+        <div style={styles.topBar}>
+          <button onClick={() => navigate("/")} style={styles.backBtn}>
+            ←
+          </button>
+          <button
+            style={styles.editBtn}
+            onClick={() =>
+              navigate("/crear-cliente", {
+                state: {
+                  modo: "editar",
+                  cliente: cliente,
+                },
+              })
+            }
+          >
+            ✏️
+          </button>
+        </div>
 
-        {/* Header simple */}
-      <div style={styles.topBar}>
-        <button onClick={() => navigate(-1)} style={styles.backBtn}>
-          ←
-        </button>
-      </div>
-      
         {/* Cliente */}
         <ClienteBadge
           nombre={cliente.nombre}
@@ -86,21 +110,51 @@ export default function PaginaCliente() {
         />
 
         {/* Total */}
-        <MontoTotal valor={cliente.total_deuda} />
-
+        <MontoTotal valor={total} />
 
         {/* Lista */}
         <MontoList
           montos={montos}
-          onSelectMonto={(monto) => setMontoSeleccionado(monto)}
-        />
+          onSelectMonto={(monto) =>
+            setMontoSeleccionado({
+              ...monto,
+              cliente_id: cliente.id,
+            })
+          }        />
 
-        {/* Modal */}
+        {/* Modal detalle */}
         {montoSeleccionado && (
           <MontoDetalleModal
             monto={montoSeleccionado}
             onClose={() => setMontoSeleccionado(null)}
           />
+        )}
+
+        {/* Modal confirmación */}
+        {mostrarConfirmacion && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modal}>
+              <p style={{ marginBottom: "20px" }}>
+                ¿Seguro que deseas pagar todo?
+              </p>
+
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  style={styles.confirmButton}
+                  onClick={ejecutarPagoTotal}
+                >
+                  Sí, pagar
+                </button>
+
+                <button
+                  style={styles.cancelButton}
+                  onClick={() => setMostrarConfirmacion(false)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Botones */}
@@ -115,7 +169,10 @@ export default function PaginaCliente() {
             </button>
           )}
 
-          <button style={styles.buttonPagarTodo} onClick={handlePagarTodo}>
+          <button
+            style={styles.buttonPagarTodo}
+            onClick={() => setMostrarConfirmacion(true)}
+          >
             Pagar todo
           </button>
         </div>
@@ -146,7 +203,7 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: "20px",
-    overflowX: "hidden", 
+    overflowX: "hidden",
     position: "relative",
   },
 
@@ -164,7 +221,6 @@ const styles = {
     cursor: "pointer",
     backgroundColor: "#dc2626",
     color: "white",
-    fontWeight: "500",
   },
 
   buttonAbono: {
@@ -174,8 +230,8 @@ const styles = {
     cursor: "pointer",
     backgroundColor: "#4f46e5",
     color: "white",
-    fontWeight: "500",
   },
+
   buttonPagarTodo: {
     padding: "10px 14px",
     borderRadius: "10px",
@@ -183,13 +239,13 @@ const styles = {
     cursor: "pointer",
     backgroundColor: "#7c3aed",
     color: "white",
-    fontWeight: "500",
   },
+
   topBar: {
     display: "flex",
     justifyContent: "flex-start",
-    alignItems: "center",
   },
+
   backBtn: {
     backgroundColor: "#334155",
     color: "#f1f5f9",
@@ -197,10 +253,56 @@ const styles = {
     width: "36px",
     height: "36px",
     borderRadius: "8px",
-    fontSize: "16px",
     cursor: "pointer",
+  },
+
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(0,0,0,0.6)",
     display: "flex",
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+
+  modal: {
+    backgroundColor: "#1e293b",
+    padding: "20px",
+    borderRadius: "12px",
+    border: "1px solid #334155",
+    color: "#f1f5f9",
+    textAlign: "center",
+  },
+
+  confirmButton: {
+    backgroundColor: "#16a34a",
+    color: "white",
+    border: "none",
+    padding: "10px 14px",
+    borderRadius: "8px",
+    cursor: "pointer",
+  },
+
+  cancelButton: {
+    backgroundColor: "#dc2626",
+    color: "white",
+    border: "none",
+    padding: "10px 14px",
+    borderRadius: "8px",
+    cursor: "pointer",
+  },
+  editBtn: {
+    backgroundColor: "#334155",
+    color: "white",
+    border: "none",
+    width: "36px",
+    height: "36px",
+    borderRadius: "8px",
+    cursor: "pointer",
+    marginLeft: "5px",
   },
 };

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import MontoBadge from "../../components/MontoBadge/MontoBadge";
 
@@ -6,16 +6,29 @@ export default function PaginaMonto() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const { cliente_id, tipo } = location.state || {};
+  const { cliente_id, tipo, modo, monto } = location.state || {};
+
+  const esEdicion = modo === "editar";
 
   const [valor, setValor] = useState("");
   const [descripcion, setDescripcion] = useState("");
+
+  useEffect(() => {
+    if (esEdicion && monto) {
+      setValor(Math.abs(monto.valor)); 
+      setDescripcion(monto.descripcion || "");
+    }
+  }, [esEdicion, monto]);
 
   if (!cliente_id || !tipo) {
     return <p>Error: datos incompletos</p>;
   }
 
   const tipoLabel = tipo === "deuda" ? "Deuda" : "Abono";
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat("es-CO").format(value);
+  };
 
   const handleAceptar = async () => {
     if (!valor) {
@@ -25,10 +38,11 @@ export default function PaginaMonto() {
 
     let descripcionFinal = descripcion;
 
-    // 🔥 Generar descripción automática para abono
     if (tipo === "abono") {
       const fecha = new Date().toISOString().split("T")[0];
-      descripcionFinal = `Abonó ${valor} el ${fecha}`;
+      const valorNumerico = Number(valor);
+      const valorFormateado = formatCurrency(valorNumerico);
+      descripcionFinal = `Abonó ${valorFormateado} el ${fecha}`;
     }
 
     try {
@@ -36,36 +50,57 @@ export default function PaginaMonto() {
       const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
       const valorNumerico = Number(valor);
+      const valorFinal =
+        tipo === "abono"
+          ? -Math.abs(valorNumerico)
+          : Math.abs(valorNumerico);
 
-      const valorFinal = tipo === "abono" ? -Math.abs(valorNumerico) : valorNumerico;
+      // 🔥 DIFERENCIA CLAVE
+      const url = esEdicion
+        ? `${baseUrl}/negocio/actualizarMonto`
+        : `${baseUrl}/negocio/agregarMonto`;
 
-      await fetch(`${baseUrl}/negocio/agregarMonto`, {
-        method: "POST",
+      const method = esEdicion ? "PUT" : "POST";
+
+      const body = esEdicion
+        ? {
+            id_monto: monto.id_monto,
+            id_cliente: cliente_id,
+            descripcion: descripcionFinal,
+            valor: valorFinal,
+            tipo_monto: tipo,
+            fecha: fecha,
+          }
+        : {
+            cliente_id: cliente_id,
+            descripcion: descripcionFinal,
+            valor: valorFinal,
+            tipo: tipo,
+            fecha: fecha,
+            tipo_monto: tipo,
+          };
+
+      await fetch(url, {
+        method: method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          cliente_id: cliente_id,
-          descripcion: descripcionFinal,
-          valor: valorFinal, // 👈 aquí ya va transformado
-          tipo: tipo,
-          fecha: fecha,
-          tipo_monto: tipo,
-        }),
+        body: JSON.stringify(body),
       });
 
-      // 🔥 volver a página cliente
       navigate(-1);
     } catch (err) {
       console.error(err);
-      alert("Error al crear monto");
+      alert("Error al guardar monto");
     }
   };
 
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h2 style={styles.title}>Nuevo {tipoLabel}</h2>
+        <h2 style={styles.title}>
+          {esEdicion ? "Editar" : "Nuevo"} {tipoLabel}
+        </h2>
 
         {/* Tipo */}
         <MontoBadge tipo={tipo} />
@@ -96,7 +131,7 @@ export default function PaginaMonto() {
           </button>
 
           <button style={styles.accept} onClick={handleAceptar}>
-            Aceptar
+            {esEdicion ? "Guardar cambios" : "Aceptar"}
           </button>
         </div>
       </div>
@@ -125,7 +160,6 @@ const styles = {
     flexDirection: "column",
     gap: "16px",
     boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
-    alignItems: "stretch",
   },
 
   title: {
@@ -140,7 +174,6 @@ const styles = {
     width: "100%",
     backgroundColor: "#0f172a",
     color: "#f1f5f9",
-    boxSizing: "border-box",
     outline: "none",
   },
 
@@ -152,7 +185,6 @@ const styles = {
     minHeight: "90px",
     backgroundColor: "#0f172a",
     color: "#f1f5f9",
-    boxSizing: "border-box",
     outline: "none",
   },
 

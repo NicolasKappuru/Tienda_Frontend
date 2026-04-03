@@ -44,7 +44,7 @@ export default function ClienteListSelect({ searchTerm }) {
     navigate("/pagina-cliente", {
       state: {
         cliente: {
-          id: cliente.id,
+          id: cliente.id_cliente,
           nombre: cliente.nombre,
           tipo_cliente: cliente.tipo_cliente,
         },
