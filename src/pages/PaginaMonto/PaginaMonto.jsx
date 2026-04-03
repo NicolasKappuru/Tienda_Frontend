@@ -175,6 +175,8 @@ const styles = {
     backgroundColor: "#0f172a",
     color: "#f1f5f9",
     outline: "none",
+    boxSizing: "border-box",
+
   },
 
   textarea: {
@@ -186,6 +188,7 @@ const styles = {
     backgroundColor: "#0f172a",
     color: "#f1f5f9",
     outline: "none",
+    boxSizing: "border-box",
   },
 
   buttonContainer: {

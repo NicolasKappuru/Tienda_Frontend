@@ -14,7 +14,6 @@ export default function PaginaCrearCliente() {
   const modo = location.state?.modo || "crear";
   const clienteEditar = location.state?.cliente;
 
-  // 🔹 Precargar datos en edición
   useEffect(() => {
     if (modo === "editar" && clienteEditar) {
       setNombreNuevo(clienteEditar.nombre);
@@ -22,7 +21,6 @@ export default function PaginaCrearCliente() {
     }
   }, [modo, clienteEditar]);
 
-  // 🔍 Buscar clientes para validación
   useEffect(() => {
     if (!nombreNuevo) {
       setClientes([]);
@@ -57,13 +55,11 @@ export default function PaginaCrearCliente() {
     };
   }, [nombreNuevo]);
 
-  // 🔥 Detectar si el nombre cambió
   const nombreCambio =
     modo === "crear" ||
     nombreNuevo.toLowerCase() !==
       (clienteEditar?.nombre || "").toLowerCase();
 
-  // 🔥 Validación de duplicados (ignorando mismo cliente)
   const nombreExistente = clientes.some((c) => {
     const mismoNombre =
       c.nombre.toLowerCase() === nombreNuevo.toLowerCase();
@@ -76,14 +72,12 @@ export default function PaginaCrearCliente() {
     return mismoNombre && !esMismoCliente;
   });
 
-  // 🔥 Crear o editar
   const handleGuardarCliente = async () => {
     if (!nombreNuevo || !tipoCliente) {
       alert("Debes seleccionar un tipo y escribir un nombre");
       return;
     }
 
-    // 🔥 Solo valida duplicado si el nombre cambió
     if (nombreCambio && nombreExistente) {
       alert("Ese nombre ya existe");
       return;
@@ -105,10 +99,19 @@ export default function PaginaCrearCliente() {
 
         const data = await res.json();
 
-        navigate("/pagina-cliente", {
-          state: { cliente: data },
-        });
+        if (!res.ok) {
+          console.error("Error backend:", data);
+          alert(data.error || "No se pudo actualizar el cliente");
+        }else{
+            const clienteNormalizado = {
+              ...data,
+              id: data.id || data.id_cliente,
+            };
 
+            navigate("/pagina-cliente", {
+              state: { cliente: clienteNormalizado },
+            });
+        }
       } else {
         const res = await fetch(`${baseUrl}/negocio/agregarCliente`, {
           method: "POST",
@@ -121,8 +124,13 @@ export default function PaginaCrearCliente() {
 
         const data = await res.json();
 
+        const clienteNormalizado = {
+          ...data,
+          id: data.id || data.id_cliente,
+        };
+
         navigate("/pagina-cliente", {
-          state: { cliente: data },
+          state: { cliente: clienteNormalizado },
         });
       }
     } catch (err) {

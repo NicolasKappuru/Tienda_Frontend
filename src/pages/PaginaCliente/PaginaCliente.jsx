@@ -34,6 +34,7 @@ export default function PaginaCliente() {
   }
 
   const handleAñadirMonto = () => {
+    console.log("🟢 Cliente ID:", cliente.id);
     navigate("/pagina-monto", {
       state: {
         cliente_id: cliente.id,

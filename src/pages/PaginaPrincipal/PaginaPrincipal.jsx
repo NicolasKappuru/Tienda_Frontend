@@ -20,7 +20,7 @@ export default function PaginaPrincipal() {
             style={styles.input}
           />
 
-          {search && <ClienteListSelect searchTerm={search} />}
+          {search &&  <ClienteListSelect searchTerm={search} />}
         </div>
 
         <button

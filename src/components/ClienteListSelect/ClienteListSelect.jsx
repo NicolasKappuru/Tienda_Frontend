@@ -41,6 +41,8 @@ export default function ClienteListSelect({ searchTerm }) {
   }, [searchTerm]);
 
   const handleSelect = (cliente) => {
+    console.log("🟢 Cliente seleccionado RAW:", cliente);
+
     navigate("/pagina-cliente", {
       state: {
         cliente: {
