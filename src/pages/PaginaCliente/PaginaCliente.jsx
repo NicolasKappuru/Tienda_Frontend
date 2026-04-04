@@ -10,12 +10,13 @@ export default function PaginaCliente() {
   const navigate = useNavigate();
 
   const { cliente } = location.state || {};
-
   const [montos, setMontos] = useState([]);
   const [total, setTotal] = useState(0);
   const [montoSeleccionado, setMontoSeleccionado] = useState(null);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
+  const [mostrarEliminar, setMostrarEliminar] = useState(false);
 
+  
   useEffect(() => {
     if (!cliente?.id) return;
     const baseUrl = import.meta.env.VITE_API_BASE_URL;
@@ -81,6 +82,26 @@ export default function PaginaCliente() {
     }
   };
 
+  const eliminarCliente = async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL;
+
+      await fetch(
+        `${baseUrl}/negocio/eliminarCliente?cliente_id=${cliente.id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      // 🔥 Redirigir al home después de eliminar
+      navigate("/");
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setMostrarEliminar(false);
+    }
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.card}>
@@ -102,6 +123,12 @@ export default function PaginaCliente() {
           >
             ✏️
           </button>
+          <button
+            style={styles.deleteBtn}
+            onClick={() => setMostrarEliminar(true)}
+          >
+            🗑️
+          </button>
         </div>
 
         {/* Cliente */}
@@ -122,6 +149,31 @@ export default function PaginaCliente() {
               cliente_id: cliente.id,
             })
           }        />
+        {mostrarEliminar && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modal}>
+              <p style={{ marginBottom: "20px" }}>
+                ¿Seguro que deseas eliminar este cliente?
+              </p>
+
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  style={styles.confirmButton}
+                  onClick={eliminarCliente}
+                >
+                  Sí, eliminar
+                </button>
+
+                <button
+                  style={styles.cancelButton}
+                  onClick={() => setMostrarEliminar(false)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Modal detalle */}
         {montoSeleccionado && (
@@ -297,6 +349,16 @@ const styles = {
     cursor: "pointer",
   },
   editBtn: {
+    backgroundColor: "#334155",
+    color: "white",
+    border: "none",
+    width: "36px",
+    height: "36px",
+    borderRadius: "8px",
+    cursor: "pointer",
+    marginLeft: "5px",
+  },
+  deleteBtn: {
     backgroundColor: "#334155",
     color: "white",
     border: "none",
